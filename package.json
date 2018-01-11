@@ -1,0 +1,23 @@
+{
+  "name": "vibedrive-daemon",
+  "version": "1.0.0",
+  "description": "bg process",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "kareniel",
+  "license": "ISC",
+  "dependencies": {
+    "concat-stream": "^1.6.0",
+    "js-yaml": "^3.10.0",
+    "managed-folder": "^0.4.0",
+    "multihashes": "^0.4.13",
+    "musicmetadata": "^2.0.5",
+    "mv": "^2.1.1",
+    "vibedrive-sdk": "file:../sdk"
+  },
+  "devDependencies": {
+    "tape": "^4.8.0"
+  }
+}
