@@ -43,7 +43,7 @@ AudioFile.prototype.load = function () {
     self.hash = multihash(data)
     self.data = data
     self.ready = true
-    self.emit('loaded')
+    self.emit('load')
   })
 
   readStream.on('error', console.log)
