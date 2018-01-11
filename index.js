@@ -38,8 +38,9 @@ if (require.main === module) {
 }
 
 async function main () {
+  var appdir = path.join(os.homedir(), 'Vibedrive')
   var opts = {
-    appdir: path.join(os.homedir(), 'Vibedrive'),
+    appdir: appdir,
     subfolders: {
       inbox: 'Inbox',
       library: 'Library',
@@ -50,20 +51,20 @@ async function main () {
   var folder = Folder(opts)
 
   folder.on('ready', function () {
-    login().then(fetchUserIdentity)
+    login.call(folder).then(fetchUserIdentity)
   })
 }
 
 function login () {
-  console.log('ready')
+  console.log('ready.', '\nappdir=', this.appdir)
 
   var folder = this
 
   folder.on('inbox:add', inboxAdd)
 
-  var login = vibedrive.auth.login(config.user.username, config.user.password)
+  var promiseOfLogin = vibedrive.auth.login(config.user.username, config.user.password)
 
-  return Promise.of(login)
+  return promiseOfLogin
 }
 
 async function fetchUserIdentity (loggedIn) {
