@@ -7,12 +7,12 @@ var assert = require('assert')
 var fs = require('fs')
 var path = require('path')
 var yaml = require('js-yaml')
+var sleep = require('hypno')
 var vibedrive = require('vibedrive-sdk')
 var Folder = require('managed-folder')
+var logger = require('./lib/logger')
 var AudioFile = require('./AudioFile')
 var { move, er } = require('./utils')
-var logger = require('./logger')
-var sleep = require('hypno')
 
 const appConfig = yaml.safeLoad(fs.readFileSync(path.join(__dirname, 'config.yaml')))
 
@@ -55,7 +55,7 @@ App.prototype.retryLogin = async function () {
   this.login()
     .then(this.fetchUserIdentity)
     .catch(async function (err) {
-      logger.warning(`failed to login. will retry in ${t} ms. ${er(err)}`)
+      logger.info(`failed to login. will retry in ${t} ms. ${er(err)}`)
       await sleep(t)
       this.retryLogin()
     })
