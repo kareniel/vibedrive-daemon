@@ -20,15 +20,16 @@ var mkdirp = require('mkdirp')
 var vibedrive = require('vibedrive-sdk')
 var Folder = require('managed-folder')
 var AudioFile = require('./AudioFile')
+var logger = require('../lib/logger')
 var folderStructureFromHash = require('./folder-structure')
 
 const config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, 'config.yaml')))
 
 if (require.main === module) {
-  console.log(pkg.name, ': called directly')
+  logger.debug(pkg.name, ': called directly')
   main()
 } else {
-  console.log(pkg.name, ': required as a module')
+  logger.debug(pkg.name, ': required as a module')
   module.exports = {
     login,
     fetchUserIdentity,
@@ -55,7 +56,7 @@ async function main () {
 }
 
 function login () {
-  console.log('ready')
+  logger.info('ready')
 
   var folder = this
 
@@ -71,16 +72,16 @@ async function fetchUserIdentity (loggedIn) {
 
   try {
     var { id, email, username } = await vibedrive.user.get()
-    console.log('logged in with', id, email, username)
+    logger.debug('logged in with', id, email, username)
   } catch (err) {
     // panic
-    console.error(err)
+    logger.error(err)
     process.exit(0)
   }
 }
 
 function inboxAdd (filepath) {
-  console.log('file added to inbox folder:', filepath)
+  logger.debug('file added to inbox folder:', filepath)
 
   var folder = this
   var fileExtension = path.extname(filepath)
@@ -95,7 +96,7 @@ function inboxAdd (filepath) {
   // mp3 only
   if (!['.mp3'].includes(fileExtension)) {
     moveToUnsupportedFolder.call(file)
-    return console.warn(`couldn't read ${fileExtension} file. moved to the 'unsupported' folder.`)
+    return logger.warning(`couldn't read ${fileExtension} file. moved to the 'unsupported' folder.`)
   }
 
   var audioFile = AudioFile({
@@ -123,11 +124,11 @@ function inboxAdd (filepath) {
   async function onLoad () {
     try {
       await vibedrive.track.create(audioFile)
-      console.log('track created')
+      logger.debug('track created')
       var filename = path.basename(filepath)
 
       await vibedrive.upload.upload(audioFile)
-      console.log('file uploaded')
+      logger.debug('file uploaded')
 
       var folderStructure = folderStructureFromHash(audioFile.hash)
       var destination = path.join(filepath, '../../', 'Library', folderStructure)
@@ -137,11 +138,11 @@ function inboxAdd (filepath) {
         mv(filepath, path.join(destination, filename), function (err) {
           if (err) { return console.log(err) }
           // done
-          console.log('moved the file.')
+          logger.debug('moved the file.')
         })
       })
     } catch (err) {
-      console.log('oops', err)
+      logger.error('oops', err)
     }
   }
 
@@ -154,7 +155,7 @@ function inboxAdd (filepath) {
   }
 
   function onLoadError (err) {
-    console.log(err)
+    logger.error(err)
   }
 }
 
