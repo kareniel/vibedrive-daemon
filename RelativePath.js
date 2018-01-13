@@ -4,20 +4,20 @@ var assert = require('assert')
 module.exports = RelativePath
 
 function RelativePath () {
-  return {
-    from: function (hash = '') {
-      assert.ok(typeof hash, 'string')
+  if (!(this instanceof RelativePath)) return new RelativePath()
+}
 
-      var hashArr = hash.split('')
-      var dir = '/'
+RelativePath.from = function (hash = '') {
+  assert.ok(typeof hash, 'string')
 
-      // dir = '/', then 3x2 bytes joined by '/', followed by the rest of the bytes
-      for (let i = 0; i < 4; i++) {
-        var part = hashArr.shift() + hashArr.shift()
-        dir = path.join(dir, part)
-      }
+  var hashArr = hash.split('')
+  var dir = '/'
 
-      return path.join(dir, hashArr.join(''))
-    }
+  // dir = '/', then 3x2 bytes joined by '/', followed by the rest of the bytes
+  for (let i = 0; i < 4; i++) {
+    var part = hashArr.shift() + hashArr.shift()
+    dir = path.join(dir, part)
   }
+
+  return path.join(dir, hashArr.join(''))
 }

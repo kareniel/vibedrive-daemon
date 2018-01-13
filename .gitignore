@@ -2,3 +2,4 @@ node_modules
 **/*.log
 config.yaml
 vibedrive::testuser@vibedrive.co
+coverage

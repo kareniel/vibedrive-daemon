@@ -62,7 +62,8 @@ App.prototype.retryLogin = async function () {
 }
 
 App.prototype.login = function () {
-  var promiseOfLogin = vibedrive.auth.login(this.config.user.username, this.config.user.password)
+  var promiseOfLogin = this.vibedrive.auth
+    .login(this.config.user.username, this.config.user.password)
 
   return promiseOfLogin
 }
@@ -74,48 +75,32 @@ App.prototype.fetchUserIdentity = async function (loggedIn) {
 }
 
 App.prototype.onFileAdded = function (filepath) {
-  logger.debug('file added to inbox folder:', path.basename(filepath))
-
-  var file = {
-    name: path.basename(filepath),
-    filepath,
-    extension: path.extname(filepath),
-    stats: fs.statSync(filepath),
-    _folder: this.folder
-  }
-
-  // mp3 only
-  if (!['.mp3'].includes(file.extension)) {
-    var inboxFolder = file.filepath
-    var unsupportedFolder = path.join(this.folder.subfolders.unsupported, path.basename(file.filepath))
-    move(inboxFolder, unsupportedFolder)
-    logger.info(`couldn't read ${file.extension} file.`)
-    logger.debug(`${file.name} moved to the $unsupported folder.`)
-    return
-  }
-
+  var folder = this.folder
   var audioFile = AudioFile({
-    name: path.basename(file.filepath),
-    path: file.filepath,
+    name: path.basename(filepath),
+    path: filepath,
+    extension: path.extname(filepath),
     type: 'audio/mp3',
-    size: file.stats.size
+    size: fs.statSync(filepath).size
   })
 
-  audioFile.on('error', this.onAudioFileLoadError)
-  audioFile.on('load', this.onAudioFileLoad)
+  audioFile.on('load', () => {
+    this.createTrackFrom(audioFile).then(() => {
+      var inbox = filepath
+      var library = path.join(folder.appdir, 'Library', audioFile.relativePath())
+      move(inbox, library)
+    })
+  })
+
+  audioFile.on('error', err => {
+    if (err.code === 'unsupported') {
+      var inboxDir = filepath
+      var unsupportedDir = path.join(this.folder.subfolders.unsupported, path.basename(filepath))
+      move(inboxDir, unsupportedDir)
+    }
+  })
 
   audioFile.load()
-}
-
-App.prototype.onAudioFileLoadError = function (err) {
-  logger.error(err)
-}
-
-App.prototype.onAudioFileLoad = async function (audioFile) {
-  var inbox = audioFile._file.filepath
-  var library = path.join(this.folder, 'Library', audioFile.relativePath())
-
-  this.createTrackFrom(audioFile).then(() => move(inbox, library))
 }
 
 App.prototype.createTrackFrom = function (audioFile) {

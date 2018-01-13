@@ -1,6 +1,6 @@
 var Nanobus = require('nanobus')
 var fs = require('fs')
-var mm = require('musicmetadata')
+var mm = require('music-metadata')
 var concat = require('concat-stream')
 var crypto = require('crypto')
 var multihashes = require('multihashes')
@@ -26,13 +26,12 @@ function AudioFile (file) {
 
 AudioFile.prototype = Object.create(Nanobus.prototype)
 
-AudioFile.prototype._getRelativePath = function (hash) {
-  return RelativePath.from(hash)
+AudioFile.prototype._getRelativePath = function () {
+  return RelativePath.from(this.hash)
 }
 
 AudioFile.prototype.load = function () {
   var readStream = fs.createReadStream(this._file.path)
-  var opts = { duration: true, fileSize: this._file.size }
   var self = this
 
   if (this._file.type !== 'audio/mp3') {
@@ -40,10 +39,12 @@ AudioFile.prototype.load = function () {
     return
   }
 
-  mm(readStream, opts, function (err, metadata) {
-    if (err) throw err
-    self.metadata = metadata
-  })
+  var opts = { duration: true, fileSize: this._file.size }
+
+  mm.parseStream(readStream, 'audio/mpeg', opts)
+    .then(function (metadata) {
+      self.metadata = metadata
+    })
 
   var writeStream = concat(function (data) {
     self.hash = multihash(data)
