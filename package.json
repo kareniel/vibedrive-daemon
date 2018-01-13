@@ -15,7 +15,8 @@
     "multihashes": "^0.4.13",
     "musicmetadata": "^2.0.5",
     "mv": "^2.1.1",
-    "vibedrive-sdk": "file:../sdk"
+    "vibedrive-sdk": "file:../sdk",
+    "winston": "^3.0.0-rc1"
   },
   "devDependencies": {
     "tape": "^4.8.0"

@@ -4,6 +4,7 @@ var mm = require('musicmetadata')
 var concat = require('concat-stream')
 var crypto = require('crypto')
 var multihashes = require('multihashes')
+var RelativePath = require('./RelativePath')
 
 module.exports = AudioFile
 
@@ -17,12 +18,17 @@ function AudioFile (file) {
   this.size = file.size
 
   this.hash = null
+  this.relativePath = this._getRelativePath.bind(this)
   this.data = null
   this.metadata = null
   this.ready = false
 }
 
 AudioFile.prototype = Object.create(Nanobus.prototype)
+
+AudioFile.prototype._getRelativePath = function (hash) {
+  return RelativePath.from(hash)
+}
 
 AudioFile.prototype.load = function () {
   var readStream = fs.createReadStream(this._file.path)

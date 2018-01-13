@@ -2,101 +2,96 @@ if (!['production'].includes(process.env.NODE_ENV)) {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
 }
 
-global.window = {
-  localStorage: {
-    getItem: () => {},
-    setItem: () => {}
-  }
-}
-
-var pkg = require('./package.json')
 var os = require('os')
 var assert = require('assert')
 var fs = require('fs')
 var path = require('path')
 var yaml = require('js-yaml')
-var mv = require('mv')
-var mkdirp = require('mkdirp')
 var vibedrive = require('vibedrive-sdk')
 var Folder = require('managed-folder')
 var AudioFile = require('./AudioFile')
-var logger = require('../lib/logger')
-var folderStructureFromHash = require('./folder-structure')
+var { move, er } = require('./utils')
+var logger = require('./logger')
+var sleep = require('hypno')
 
-const config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, 'config.yaml')))
+const appConfig = yaml.safeLoad(fs.readFileSync(path.join(__dirname, 'config.yaml')))
 
 if (require.main === module) {
-  logger.debug(pkg.name, ': called directly')
-  main()
+  logger.debug('called directly')
+  App(vibedrive)
 } else {
-  logger.debug(pkg.name, ': required as a module')
-  module.exports = {
-    login,
-    fetchUserIdentity,
-    inboxAdd,
-    mvRecursive
-  }
+  logger.debug('required as a module')
+  module.exports = App
 }
 
-async function main () {
-  var opts = {
+function App (vibedrive) {
+  this.vibedrive = vibedrive
+  this.config = appConfig
+  this.folder = Folder({
     appdir: path.join(os.homedir(), 'Vibedrive'),
     subfolders: {
       inbox: 'Inbox',
       library: 'Library',
       unsupported: 'Unsupported'
     }
-  }
+  })
 
-  var folder = Folder(opts)
+  this.folder.on('ready', () => {
+    logger.info('ready.')
+    logger.info('appdir=' + this.folder.appdir)
 
-  folder.on('ready', function () {
-    login().then(fetchUserIdentity)
+    this.folder.on('inbox:add', this.onFileAdded)
+
+    this.init()
   })
 }
 
-function login () {
-  logger.info('ready')
-
-  var folder = this
-
-  folder.on('inbox:add', inboxAdd)
-
-  var login = vibedrive.auth.login(config.user.username, config.user.password)
-
-  return Promise.of(login)
+App.prototype.init = function () {
+  this.retryLogin()
 }
 
-async function fetchUserIdentity (loggedIn) {
-  assert.equal(loggedIn, true, 'expect true if login succeeded')
-
-  try {
-    var { id, email, username } = await vibedrive.user.get()
-    logger.debug('logged in with', id, email, username)
-  } catch (err) {
-    // panic
-    logger.error(err)
-    process.exit(0)
-  }
+App.prototype.retryLogin = async function () {
+  const t = 5000
+  this.login()
+    .then(this.fetchUserIdentity)
+    .catch(async function (err) {
+      logger.warning(`failed to login. will retry in ${t} ms. ${er(err)}`)
+      await sleep(t)
+      this.retryLogin()
+    })
 }
 
-function inboxAdd (filepath) {
-  logger.debug('file added to inbox folder:', filepath)
+App.prototype.login = function () {
+  var promiseOfLogin = vibedrive.auth.login(this.config.user.username, this.config.user.password)
 
-  var folder = this
-  var fileExtension = path.extname(filepath)
-  var stats = fs.statSync(filepath)
+  return promiseOfLogin
+}
+
+App.prototype.fetchUserIdentity = async function (loggedIn) {
+  assert.equal(loggedIn, true, 'expect loggedIn to be true if login succeeded')
+
+  return vibedrive.user.get()
+}
+
+App.prototype.onFileAdded = function (filepath) {
+  logger.debug('file added to inbox folder:', path.basename(filepath))
+
   var file = {
+    name: path.basename(filepath),
     filepath,
-    fileExtension,
-    stats,
-    _folder: folder
+    extension: path.extname(filepath),
+    stats: fs.statSync(filepath),
+    _folder: this.folder
   }
 
   // mp3 only
-  if (!['.mp3'].includes(fileExtension)) {
-    moveToUnsupportedFolder.call(file)
-    return logger.warning(`couldn't read ${fileExtension} file. moved to the 'unsupported' folder.`)
+  if (!['.mp3'].includes(file.extension)) {
+    var inboxFolder = file.filepath
+    var unsupportedFolder = path.join(this.folder.subfolders.unsupported, path.basename(file.filepath))
+    move(inboxFolder, unsupportedFolder)
+    logger.info(`couldn't read ${file.extension} file.`)
+    logger.debug(`${file.name} moved to the $unsupported folder.`)
+    return
   }
 
   var audioFile = AudioFile({
@@ -106,61 +101,25 @@ function inboxAdd (filepath) {
     size: file.stats.size
   })
 
-  audioFile.on('error', onLoadError)
-  audioFile.on('load', onLoad)
+  audioFile.on('error', this.onAudioFileLoadError)
+  audioFile.on('load', this.onAudioFileLoad)
 
   audioFile.load()
-
-  function moveToUnsupportedFolder () {
-    var file = this
-
-    var unsupportedSubfolder = file._folder.subfolders.unsupported
-    var source = file.filepath
-    var destination = path.join(unsupportedSubfolder, path.basename(file.filepath))
-
-    mvRecursive(source, destination)
-  }
-
-  async function onLoad () {
-    try {
-      await vibedrive.track.create(audioFile)
-      logger.debug('track created')
-      var filename = path.basename(filepath)
-
-      await vibedrive.upload.upload(audioFile)
-      logger.debug('file uploaded')
-
-      var folderStructure = folderStructureFromHash(audioFile.hash)
-      var destination = path.join(filepath, '../../', 'Library', folderStructure)
-
-      mkdirp(destination, function (err) {
-        if (err) { return console.log(err) }
-        mv(filepath, path.join(destination, filename), function (err) {
-          if (err) { return console.log(err) }
-          // done
-          logger.debug('moved the file.')
-        })
-      })
-    } catch (err) {
-      logger.error('oops', err)
-    }
-  }
-
-  function createTrack () {
-
-  }
-
-  function uploadFile () {
-
-  }
-
-  function onLoadError (err) {
-    logger.error(err)
-  }
 }
 
-function mvRecursive (source, destination) {
-  mv(source, destination, function (err) {
-    if (err) mvRecursive(source, destination)
-  })
+App.prototype.onAudioFileLoadError = function (err) {
+  logger.error(err)
+}
+
+App.prototype.onAudioFileLoad = async function (audioFile) {
+  var inbox = audioFile._file.filepath
+  var library = path.join(this.folder, 'Library', audioFile.relativePath())
+
+  this.createTrackFrom(audioFile).then(() => move(inbox, library))
+}
+
+App.prototype.createTrackFrom = function (audioFile) {
+  return this.vibedrive.track.create(audioFile)
+    .then(() => logger.info(`created track: ${audioFile.name}`))
+    .catch(err => logger.error(`failed to create track: ${audioFile.name}. \n${er(err)}`))
 }

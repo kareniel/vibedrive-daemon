@@ -1,9 +1,9 @@
 var path = require('path')
 var assert = require('assert')
 
-module.exports = AbsolutePath
+module.exports = RelativePath
 
-function AbsolutePath () {
+function RelativePath () {
   return {
     from: function (hash = '') {
       assert.ok(typeof hash, 'string')
@@ -11,8 +11,7 @@ function AbsolutePath () {
       var hashArr = hash.split('')
       var dir = '/'
 
-      // dir = 3x2 bytes joined by '/' and followed by the rest of the bytes
-
+      // dir = '/', then 3x2 bytes joined by '/', followed by the rest of the bytes
       for (let i = 0; i < 4; i++) {
         var part = hashArr.shift() + hashArr.shift()
         dir = path.join(dir, part)
