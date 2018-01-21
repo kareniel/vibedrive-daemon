@@ -3,3 +3,5 @@ node_modules
 config.yaml
 vibedrive::testuser@vibedrive.co
 coverage
+.nyc_output
+vibedrive-db

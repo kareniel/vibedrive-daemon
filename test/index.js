@@ -1,1 +1,2 @@
-require('./App.spec')
+require('./connected')
+require('./inbox')
