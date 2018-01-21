@@ -5,14 +5,12 @@ var fs = require('fs')
 var cp = require('node-cp')
 var yaml = require('js-yaml')
 var path = require('path')
-var test = require('tape')
+var tape = require('tape')
 var services = require('vibedrive-sdk')
 var App = require('../.')
 var config = yaml.safeLoad(fs.readFileSync(path.join(__dirname, '../config.yaml')))
-var app = App(services, {
-  appdir: os.homedir() + '/__VibedriveTEST__',
-  user: config.user
-})
+
+var app
 
 test('file is unsupported: move file to the unsupported folder', t => {
   t.plan(1)
@@ -64,3 +62,22 @@ test('file is supported: create a new track', t => {
   })
   t.end()
 })
+
+function test (description, fn) {
+  tape(description, function (t) {
+    setup()
+    fn(t)
+    teardown()
+  })
+}
+
+function setup () {
+  app = App(services, {
+    appdir: os.homedir() + '/__VibedriveTEST__',
+    user: config.user
+  })
+}
+
+function teardown () {
+  app.quit()
+}
