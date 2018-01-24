@@ -5,19 +5,21 @@
   "main": "index.js",
   "scripts": {
     "start": "node .",
-    "test": "standard --fix && node test | tap-spec"
+    "test": "NODE_ENV=test node test | tap-spec"
   },
   "author": "kareniel",
   "license": "ISC",
   "dependencies": {
     "concat-stream": "^1.6.0",
+    "cp": "^0.2.0",
     "hypno": "^1.0.0",
     "js-yaml": "^3.10.0",
-    "managed-folder": "^0.4.0",
+    "managed-folder": "^0.5.0",
     "multihashes": "^0.4.13",
     "music-metadata": "^0.8.7",
     "musicmetadata": "^2.0.5",
     "mv": "^2.1.1",
+    "nanobus": "^4.3.2",
     "unzip": "^0.1.11",
     "vibedrive-sdk": "file:../sdk",
     "winston": "^3.0.0-rc1"
@@ -28,6 +30,7 @@
     "nyc": "^11.4.1",
     "proxyquire": "^1.8.0",
     "sinon": "^4.1.5",
+    "tap-bail": "^1.0.0",
     "tap-spec": "^4.1.1",
     "tape": "^4.8.0"
   }
