@@ -10,41 +10,43 @@ var services = require('vibedrive-sdk')
 var App = require('../.')
 var { user } = yaml.safeLoad(fs.readFileSync(path.join(__dirname, '../config.yaml')))
 var sleep = require('hypno')
+var chokidar = require('chokidar')
 var appdir = os.homedir() + '/__VibedriveTEST__'
 
 function setupApp () {
-  return App(services, { appdir, user})
+  return App(services, { appdir, user })
 }
 
-// test('file is unsupported: move file to the unsupported folder', t => {
-//   t.plan(1)
+test('file is unsupported: move file to the unsupported folder', t => {
+  t.plan(1)
 
-//   rimraf.sync(appdir)
+  rimraf.sync(appdir)
 
-//   var app = setupApp()
+  var app = setupApp()
 
-//   app.on('ready', async function () {
-//     const fileName = 'file.txt'
+  app.on('ready', async function () {
+    const fileName = 'file.txt'
 
-//     var filePath = path.join(app.folder.subfolder('inbox'), fileName)
-//     var unsupported = app.folder.subfolder('unsupported')
+    var filePath = path.join(app.folder.subfolder('inbox'), fileName)
+    var unsupported = app.folder.subfolder('unsupported')
 
-//     fs.writeFileSync(filePath, 'whatever')
+    fs.writeFileSync(filePath, 'whatever')
 
-//     await sleep(1000)
+    await sleep(1000)
 
-//     var files = fs.readdirSync(unsupported)
+    var files = fs.readdirSync(unsupported)
 
-//     t.equal(files.includes(fileName), true, 'file is now in unsupported folder')
-//     t.end()
-//     app.quit()
-//   })
-// })
+    t.equal(files.includes(fileName), true, 'file is now in unsupported folder')
+    t.end()
+    app.quit()
+  })
+})
 
 test('file is a zip: unzip file and move it to the archive folder', t => {
   rimraf.sync(appdir)
 
   var app = setupApp()
+  var i = 0
 
   app.on('ready', function () {
     var zippedFileName = 'archive.zip'
@@ -53,61 +55,81 @@ test('file is a zip: unzip file and move it to the archive folder', t => {
     var inbox = app.folder.subfolder('inbox')
     var archives = app.folder.subfolder('archives')
 
-    var inboxWatcher = fs.watch(inbox)
-    var archivesWatcher = fs.watch(archives)
+    var inboxWatcher = chokidar.watch(inbox)
+    var archivesWatcher = chokidar.watch(archives)
 
-    inboxWatcher.on('change', function (eventName, changedFile) {
-      if (changedFile === zippedFileName) { return t.pass('archive is moved to inbox') }
-      if (changedFile === unzippedFileName) { return t.pass('archive is unzipped') }
-    })
-
-    archivesWatcher.on('change', function (eventName, changedFile) {
-      if (changedFile === zippedFileName) {
-        t.pass('archive is moved to archives')
-        app.quit()
-        t.end()
-      }
-    })
+    inboxWatcher.on('add', onChange)
+    archivesWatcher.on('add', onChange)
 
     var src = path.join(__dirname, zippedFileName)
     var dest = path.join(inbox, zippedFileName)
+    var file = fs.readFileSync(src)
 
-    fs.writeFileSync(dest, fs.readFileSync(src))
-    t.equal(fs.existsSync(dest), true, 'file was copied to inbox')
+    fs.writeFileSync(dest, file)
+
+    function onChange (filepath) {
+      var filename = path.basename(filepath)
+      var dir = path.dirname(filepath)
+
+      if (dir === inbox && filename === zippedFileName) {
+        t.pass('archive is moved to inbox folder')
+        i++
+      }
+
+      if (dir === inbox && filename === unzippedFileName) {
+        t.pass('archive is unzipped')
+        i++
+      }
+
+      if (dir === archives && filename === zippedFileName) {
+        t.pass('archive is moved to archives folder')
+        i++
+      }
+
+      if (i === 3) return cleanup()
+    }
+
+    async function cleanup () {
+      // make sure writeFile is done with the file
+      await sleep(0)
+      inboxWatcher.close()
+      archivesWatcher.close()
+      app.quit()
+      console.log('end')
+      t.end()
+    }
   })
 })
 
-// test('file is supported: create a new track', t => {
-//   t.plan(3)
+test('file is supported: create a new track', { timeout: 3000 }, t => {
+  rimraf.sync(appdir)
 
-//   var app = setupApp()
+  var app = setupApp()
 
-//   var fileName = 'audio-file.mp3'
-//   var waiting = path.join(app.folder.appdir, app.folder.subfolders.waiting)
-//   var inbox = path.join(app.folder.appdir, app.folder.subfolders.inbox)
-//   var waitingWatcher = fs.watch(waiting)
+  app.on('ready', function () {
+    var fileName = 'audio-file.mp3'
+    var inbox = app.folder.subfolder('inbox')
+    var waiting = app.folder.subfolder('waiting')
+    var waitingWatcher = chokidar.watch(waiting)
 
-//   waitingWatcher.on('change', onWaitingChange)
+    waitingWatcher.on('add', onWaitingChange)
 
-//   cp(fileName, inbox)
+    var src = path.join(__dirname, fileName)
+    var dest = path.join(inbox, fileName)
 
-//   var timeout = setTimeout(function () {
-//     clearTimeout(timeout)
-//     t.fail('file should be in waiting folder in less than 3 seconds')
-//     app.quit()
-//     app = null
-//   }, 3000)
+    fs.writeFileSync(dest, fs.readFileSync(src))
 
-//   function onWaitingChange (eventType, changedFile) {
-//     if (changedFile === fileName) {
-//       clearTimeout(timeout)
-//       waitingWatcher.close()
-//       t.pass('file is in waiting folder')
+    function onWaitingChange (filepath) {
+      if (path.basename(filepath) === fileName) {
+        waitingWatcher.close()
+        t.pass('file is in waiting folder')
 
-//       services.dataStore.get('track', fileName)
-//       t.fail('track exits')
-//       t.fail('file is on the server')
-//       app.quit()
-//     }
-//   }
-// })
+      //   // services.dataStore.get('track', fileName)
+      //   // t.fail('track exits')
+      //   // t.fail('file is on the server')
+        app.quit()
+        t.end()
+      }
+    }
+  })
+})
